@@ -1,0 +1,77 @@
+Reporte de luminancia y contraste - Modulo de Rostro (QC tarea 3)
+Generado: 2026-06-20 19:22:55
+======================================================================
+
+Umbrales usados (laxos, solo casos extremos):
+  subexpuesta    : luminancia < 35.0
+  sobreexpuesta  : luminancia > 220.0
+  bajo_contraste : contraste  < 18.0
+
+Distribucion global (escala 0-255):
+  luminancia: min=20.2  mediana=115.1  media=116.6  max=228.9
+  contraste : min=20.1  mediana=59.1  media=59.4  max=110.0
+
+Imagenes medidas:      28782
+Subexpuestas:          44
+Sobreexpuestas:        10
+Bajo contraste:        0
+Fuera de norma (total): 54
+
+NOTA: esta etapa NO elimino nada del dataset; solo midio y marco.
+
+Imagenes fuera de norma (ruta | motivos | luminancia | contraste):
+----------------------------------------------------------------------
+AffNet/Train/anger/image0028095.jpg | subexpuesta | 22.9 | 26.2
+AffNet/Train/contempt/image0036536.jpg | subexpuesta | 33.9 | 35.7
+AffNet/Train/contempt/image0036798.jpg | subexpuesta | 34.2 | 31.8
+AffNet/Train/disgust/image0041326.jpg | subexpuesta | 20.2 | 24.5
+AffNet/Train/disgust/image0042125.jpg | sobreexpuesta | 221.0 | 47.0
+AffNet/Train/fear/image0035863.jpg | subexpuesta | 24.8 | 29.2
+AffNet/Train/fear/image0036097.jpg | subexpuesta | 27.9 | 29.9
+AffNet/Train/fear/image0036281.jpg | subexpuesta | 31.4 | 33.7
+AffNet/Train/fear/image0036328.jpg | subexpuesta | 29.2 | 41.1
+AffNet/Train/fear/image0037558.jpg | subexpuesta | 33.2 | 44.0
+AffNet/Train/fear/image0038412.jpg | subexpuesta | 34.2 | 65.7
+AffNet/Train/fear/image0039350.jpg | subexpuesta | 30.3 | 38.0
+AffNet/Train/fear/image0039623.jpg | subexpuesta | 22.9 | 25.5
+AffNet/Train/fear/image0039641.jpg | subexpuesta | 32.7 | 52.4
+AffNet/Train/fear/image0040027.jpg | subexpuesta | 34.1 | 34.0
+AffNet/Train/fear/image0040189.jpg | sobreexpuesta | 220.3 | 36.9
+AffNet/Train/fear/image0040746.jpg | sobreexpuesta | 224.0 | 42.7
+AffNet/Train/happy/ffhq_2754.png | sobreexpuesta | 226.9 | 26.0
+AffNet/Train/happy/ffhq_3120.png | subexpuesta | 22.8 | 20.1
+AffNet/Train/happy/ffhq_3670.png | subexpuesta | 31.9 | 26.9
+AffNet/Train/happy/ffhq_4706.png | subexpuesta | 22.9 | 25.2
+AffNet/Train/happy/ffhq_4915.png | subexpuesta | 30.4 | 33.6
+AffNet/Train/neutral/ffhq_4507.png | subexpuesta | 30.9 | 44.8
+AffNet/Train/neutral/ffhq_4685.png | subexpuesta | 33.4 | 44.0
+AffNet/Train/neutral/ffhq_4933.png | subexpuesta | 34.8 | 39.7
+AffNet/Train/sad/image0022871.jpg | subexpuesta | 30.6 | 27.0
+AffNet/Train/sad/image0025536.jpg | subexpuesta | 31.3 | 44.8
+AffNet/Train/surprise/image0031962.jpg | subexpuesta | 27.0 | 31.9
+AffNet/Train/surprise/image0032004.jpg | subexpuesta | 28.9 | 39.9
+AffNet/Train/surprise/image0034483.jpg | sobreexpuesta | 221.4 | 35.0
+AffNet/Train/surprise/image0034513.jpg | sobreexpuesta | 221.3 | 36.4
+AffNet/Test/Anger/image0004946.jpg | sobreexpuesta | 228.9 | 31.6
+AffNet/Test/Anger/image0017056.jpg | subexpuesta | 31.1 | 30.6
+AffNet/Test/disgust/image0031155.jpg | subexpuesta | 32.3 | 27.8
+AffNet/Test/disgust/image0035296.jpg | sobreexpuesta | 224.4 | 31.7
+AffNet/Test/fear/image0019454.jpg | subexpuesta | 28.1 | 49.5
+AffNet/Test/fear/image0021843.jpg | subexpuesta | 32.0 | 27.5
+AffNet/Test/fear/image0024134.jpg | subexpuesta | 32.8 | 52.4
+AffNet/Test/fear/image0027588.jpg | subexpuesta | 32.3 | 52.1
+AffNet/Test/fear/image0029035.jpg | subexpuesta | 34.5 | 30.8
+AffNet/Test/fear/image0031573.jpg | subexpuesta | 24.7 | 20.3
+AffNet/Test/fear/image0032395.jpg | subexpuesta | 31.0 | 25.3
+AffNet/Test/fear/image0034475.jpg | subexpuesta | 31.7 | 31.7
+AffNet/Test/happy/ffhq_832.png | subexpuesta | 31.3 | 29.3
+AffNet/Test/neutral/ffhq_1702.png | subexpuesta | 33.9 | 40.9
+AffNet/Test/neutral/ffhq_286.png | sobreexpuesta | 228.4 | 39.7
+AffNet/Test/neutral/ffhq_987.png | subexpuesta | 26.5 | 40.5
+AffNet/Test/sad/image0005698.jpg | sobreexpuesta | 222.3 | 39.0
+AffNet/Test/sad/image0011976.jpg | subexpuesta | 33.6 | 32.8
+AffNet/Test/sad/image0015731.jpg | subexpuesta | 31.5 | 32.8
+AffNet/Test/sad/image0015875.jpg | subexpuesta | 28.1 | 42.6
+AffNet/Test/sad/image0020418.jpg | subexpuesta | 26.4 | 22.4
+AffNet/Test/surprise/image0004982.jpg | subexpuesta | 25.6 | 24.2
+AffNet/Test/surprise/image0017575.jpg | subexpuesta | 34.4 | 35.3
