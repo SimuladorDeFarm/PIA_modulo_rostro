@@ -18,7 +18,8 @@ disco lo que detecta, se agrega `-r` / `--remove`.
 | `-i` / `--integridad` | **Tarea 1** — detecta imágenes corruptas y con dimensiones anómalas (distinto a 96×96). |
 | `-d` / `--duplicados` | **Tarea 2** — detecta duplicados exactos por hash (SHA256); conserva una copia por grupo. |
 | `-l` / `--luminancia` | **Tarea 3** — mide luminancia y contraste (96×96) y marca las imágenes fuera de norma. |
-| `-r` / `--remove` | Modificador: **elimina del disco** lo detectado por las etapas activas. Sin `-r` no se borra nada. |
+| `-e` / `--reescalar` | **Tarea 5** — reescala las sobrevivientes a 128×128 en un dataset nuevo (`AffNet_128/`), en paralelo con todos los hilos. No toca el original. |
+| `-r` / `--remove` | Modificador: **elimina del disco** lo detectado por las etapas activas (`-i`/`-d`/`-l`). Sin `-r` no se borra nada. |
 
 > Las flags cortas se pueden agrupar: `-lr` ≡ `-l -r`, `-ir` ≡ `-i -r`, `-dr` ≡ `-d -r`.
 
@@ -31,6 +32,7 @@ python main.py -d        # tarea 2: detectar duplicados (no borra)
 python main.py -dr       # tarea 2: detectar y eliminar duplicados
 python main.py -l        # tarea 3: luminancia/contraste (no borra)
 python main.py -lr       # tarea 3: escanear y eliminar fuera de norma
+python main.py -e        # tarea 5: reescalar a 128x128 (dataset nuevo)
 python main.py -i -d     # varias etapas en una corrida (sin borrar)
 python main.py           # sin opciones: muestra esta ayuda
 python main.py -h        # igual
@@ -48,3 +50,4 @@ python main.py -h        # igual
 | `-i` | `reportes/integridad/reporte_integridad.txt` — solo se crea si hay imágenes descartadas. |
 | `-d` | `reportes/duplicados/reporte_duplicados.txt` — solo se crea si hay grupos de duplicados. |
 | `-l` | `reportes/luminancia/reporte_luminancia.txt` — siempre se genera (incluye la distribución global y la lista fuera de norma). |
+| `-e` | `reportes/reescalado/reporte_reescalado.txt` — siempre se genera. Dataset de salida: `AffNet_128/`. |

@@ -52,3 +52,13 @@ REPORTE_LUMINANCIA_TXT = LUMINANCIA_DIR / "reporte_luminancia.txt"
 LUMINANCIA_MIN = 35.0    # media por debajo -> subexpuesta (muy oscura)
 LUMINANCIA_MAX = 220.0   # media por encima -> sobreexpuesta (muy clara)
 CONTRASTE_MIN = 18.0     # desviación estándar por debajo -> sin contraste
+
+# Reescalado (tarea 5). Resolución objetivo que leerá Py-Feat. Las imágenes
+# sobrevivientes (en DATASET_ROOT) se redimensionan y se guardan en un dataset
+# NUEVO y aparte, sin tocar el original. Se conserva la estructura de carpetas.
+TARGET_SIZE = (128, 128)                      # (ancho, alto)
+DATASET_V4_ROOT = PROJECT_ROOT / "AffNet_128"  # dataset reescalado (v4, local)
+
+# Subcarpeta y archivo de reporte del reescalado (tarea 5).
+REESCALADO_DIR = REPORTES_DIR / "reescalado"
+REPORTE_REESCALADO_TXT = REESCALADO_DIR / "reporte_reescalado.txt"

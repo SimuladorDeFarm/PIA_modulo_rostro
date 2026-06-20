@@ -2,6 +2,10 @@
 CLAUDE.md
 .claude/
 
+# Datasets generados / reportes (derivados, pesados)
+AffNet_128/
+reportes/
+
 # Entornos virtuales
 .venv/
 venv/

@@ -15,6 +15,7 @@ Uso:
     python main.py -dr              # tarea 2: detectar y eliminar duplicados
     python main.py -l               # tarea 3: luminancia/contraste (no borra)
     python main.py -lr              # tarea 3: escanear y eliminar fuera de norma
+    python main.py -e               # tarea 5: reescalar a 128x128 (dataset nuevo)
     python main.py -i -d            # varias etapas en una corrida
     python main.py                  # sin opciones: muestra la ayuda
 """
@@ -22,7 +23,7 @@ Uso:
 import argparse
 
 from src import config, dataset
-from src.qc import duplicados, integridad, luminancia
+from src.qc import duplicados, integridad, luminancia, reescalado
 
 
 def ejecutar_integridad(remove: bool = False) -> None:
@@ -142,6 +143,32 @@ def ejecutar_luminancia(remove: bool = False) -> None:
         print(f"\nReporte de luminancia -> {reporte}")
 
 
+def ejecutar_reescalado() -> None:
+    """Tarea 5: reescala las imágenes sobrevivientes a 128x128 en un dataset nuevo."""
+    hilos = reescalado.hilos_disponibles()
+    print("== QC tarea 5: reescalado a 128x128 ==")
+    print(f"Origen:  {config.DATASET_ROOT}")
+    print(f"Destino: {config.DATASET_V4_ROOT}")
+    print(f"Hilos:   {hilos} (máximo automático)")
+
+    imagenes = list(dataset.descubrir_imagenes())
+    total = len(imagenes)
+    print(f"Imágenes a reescalar: {total}")
+
+    if total == 0:
+        print("No se encontraron imágenes. Revisa DATASET_ROOT en src/config.py.")
+        return
+
+    resultado = reescalado.reescalar_dataset(imagenes)
+    reporte = reescalado.guardar_reporte(resultado, total)
+
+    print("\n-- Resumen --")
+    print(f"Imágenes de origen:     {total}")
+    print(f"Reescaladas OK:         {resultado.ok}")
+    print(f"Con error:              {len(resultado.errores)}")
+    print(f"\nReporte de reescalado -> {reporte}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construye el parser de opciones. Cada etapa de QC es una opción aparte."""
     parser = argparse.ArgumentParser(
@@ -173,6 +200,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Elimina del disco lo detectado por las etapas activas (-i/-d/-l).",
     )
+    parser.add_argument(
+        "-e",
+        "--reescalar",
+        action="store_true",
+        help="Tarea 5: reescalar las sobrevivientes a 128x128 en un dataset nuevo (paralelo).",
+    )
     return parser
 
 
@@ -181,7 +214,7 @@ def main() -> None:
     args = parser.parse_args()
 
     # Sin ninguna etapa seleccionada no hay nada que ejecutar: mostramos la ayuda.
-    if not (args.integridad or args.duplicados or args.luminancia):
+    if not (args.integridad or args.duplicados or args.luminancia or args.reescalar):
         # -r por sí solo no hace nada: hay que indicar qué etapa correr.
         parser.print_help()
         return
@@ -194,6 +227,9 @@ def main() -> None:
 
     if args.luminancia:
         ejecutar_luminancia(remove=args.remove)
+
+    if args.reescalar:
+        ejecutar_reescalado()
 
 
 if __name__ == "__main__":
