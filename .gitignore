@@ -6,6 +6,9 @@ CLAUDE.md
 AffNet_128/
 reportes/
 
+# Calibración de Py-Feat: específica de cada máquina (GPU/CPU/RAM), no se versiona
+pyfeat_config.json
+
 # Entornos virtuales
 .venv/
 venv/

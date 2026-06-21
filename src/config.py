@@ -62,3 +62,29 @@ DATASET_V4_ROOT = PROJECT_ROOT / "AffNet_128"  # dataset reescalado (v4, local)
 # Subcarpeta y archivo de reporte del reescalado (tarea 5).
 REESCALADO_DIR = REPORTES_DIR / "reescalado"
 REPORTE_REESCALADO_TXT = REESCALADO_DIR / "reporte_reescalado.txt"
+
+# Py-Feat (tarea 6). Se corre sobre el dataset reescalado (v4) y se guarda un
+# único CSV local (v5) con detección, confianza, pose, landmarks y AUs.
+FEATURES_DIR = PROJECT_ROOT / "features"
+PYFEAT_CSV = FEATURES_DIR / "pyfeat_v5.csv"
+PYFEAT_DIR = REPORTES_DIR / "pyfeat"
+REPORTE_PYFEAT_TXT = PYFEAT_DIR / "reporte_pyfeat.txt"
+
+# Dispositivo: "auto" detecta una GPU NVIDIA (CUDA) y, si no hay, usa CPU.
+# Lo normal es no tocar esto: el modo test (-t) detecta el hardware solo.
+PYFEAT_DEVICE = "auto"
+# Defaults usados solo si todavía no hay pyfeat_config.json (sin calibrar).
+PYFEAT_BATCH_SIZE = 16     # tamaño de lote para la inferencia
+PYFEAT_WORKERS = 4         # procesos en paralelo en CPU (cada uno con su detector)
+# Tope de batch_size que el calibrador puede recomendar en GPU (cota de cordura).
+PYFEAT_BATCH_MAX = 256
+
+# Calibración automática (-t) -> escribe este archivo, que -p lee. Es específico
+# de cada máquina (depende de su GPU/CPU/RAM), por eso va al .gitignore y no se
+# versiona.
+PYFEAT_CONFIG_JSON = PROJECT_ROOT / "pyfeat_config.json"
+# Fracción de VRAM a usar como tope al recomendar batch_size (0.85 = 85%, deja
+# un 15% de margen para no llenar la tarjeta).
+PYFEAT_VRAM_MARGEN = 0.85
+# Núcleos de CPU a dejar libres para que el sistema siga usable mientras corre.
+PYFEAT_CPU_RESERVA = 2

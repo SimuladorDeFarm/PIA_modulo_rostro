@@ -16,14 +16,18 @@ Uso:
     python main.py -l               # tarea 3: luminancia/contraste (no borra)
     python main.py -lr              # tarea 3: escanear y eliminar fuera de norma
     python main.py -e               # tarea 5: reescalar a 128x128 (dataset nuevo)
+    python main.py -p               # tarea 6: Py-Feat -> CSV (detección/pose/landmarks/AUs)
     python main.py -i -d            # varias etapas en una corrida
     python main.py                  # sin opciones: muestra la ayuda
 """
 
 import argparse
+import os
+import sys
+import time
 
 from src import config, dataset
-from src.qc import duplicados, integridad, luminancia, reescalado
+from src.qc import duplicados, integridad, luminancia, pyfeat, reescalado
 
 
 def ejecutar_integridad(remove: bool = False) -> None:
@@ -169,6 +173,152 @@ def ejecutar_reescalado() -> None:
     print(f"\nReporte de reescalado -> {reporte}")
 
 
+def ejecutar_pyfeat(workers: int | None = None) -> None:
+    """Tarea 6: corre Py-Feat sobre el dataset reescalado y guarda el CSV (v5).
+
+    Lee la configuración calibrada (pyfeat_config.json) que deja el modo test
+    (-pt N). Si no existe, usa los defaults de config.py y avisa que conviene
+    calibrar primero.
+    """
+    cfg = pyfeat.cargar_config()
+    if cfg:
+        device = cfg.get("device") or pyfeat.resolver_dispositivo()
+        batch_size = int(cfg.get("batch_size", config.PYFEAT_BATCH_SIZE))
+        n_workers = workers if workers is not None else int(cfg.get("workers", config.PYFEAT_WORKERS))
+        origen_cfg = f"config calibrado ({config.PYFEAT_CONFIG_JSON.name}, {cfg.get('generado', '?')})"
+    else:
+        device = pyfeat.resolver_dispositivo()
+        batch_size = config.PYFEAT_BATCH_SIZE
+        n_workers = workers if workers is not None else config.PYFEAT_WORKERS
+        origen_cfg = "defaults (sin calibrar)"
+
+    print("== QC tarea 6: extracción de features con Py-Feat ==")
+    print(f"Origen:  {config.DATASET_V4_ROOT}")
+    print(f"Salida:  {config.PYFEAT_CSV}")
+    print(f"Parámetros: {origen_cfg}")
+    if device == "cuda":
+        print(f"Dispositivo: GPU (CUDA)  |  batch_size: {batch_size}")
+    else:
+        nucleos = os.cpu_count() or 1
+        hilos = max(1, max(1, nucleos - config.PYFEAT_CPU_RESERVA) // max(1, n_workers))
+        print(f"Dispositivo: CPU  |  Paralelismo: {n_workers} procesos × {hilos} hilos torch")
+    if not cfg:
+        print("AVISO: no hay pyfeat_config.json. Recomendado calibrar antes: "
+              "python main.py -pt 10")
+
+    imagenes = list(dataset.descubrir_imagenes(config.DATASET_V4_ROOT))
+    total = len(imagenes)
+    print(f"Imágenes a procesar: {total}")
+
+    if total == 0:
+        print("No hay imágenes reescaladas. Corre primero la tarea 5 (python main.py -e).")
+        return
+
+    # Impresor de progreso en vivo: una sola línea que se reescribe.
+    ultimo = [0.0]
+
+    def progreso(hechas: int, tot: int, seg: float) -> None:
+        ahora = time.time()
+        # Throttle: refresca como máximo ~3 veces por segundo (y siempre al final).
+        if hechas < tot and ahora - ultimo[0] < 0.33:
+            return
+        ultimo[0] = ahora
+        vel = hechas / seg if seg > 0 else 0.0
+        eta = (tot - hechas) / vel if vel > 0 else 0.0
+        pct = 100.0 * hechas / tot
+        sys.stdout.write(
+            f"\r[Py-Feat] {hechas}/{tot} ({pct:4.1f}%) | "
+            f"{vel:4.1f} img/s | transcurrido {pyfeat.formato_tiempo(seg)} | "
+            f"ETA {pyfeat.formato_tiempo(eta)}   "
+        )
+        sys.stdout.flush()
+
+    print("Procesando (la primera vez puede tardar en cargar los modelos)...")
+    resultado = pyfeat.extraer(
+        imagenes, device=device, workers=n_workers,
+        batch_size=batch_size, callback_progreso=progreso,
+    )
+    print()  # salto de línea tras la barra de progreso
+
+    reporte = pyfeat.guardar_reporte(resultado)
+    vel = resultado.total / resultado.segundos if resultado.segundos else 0.0
+
+    print("\n-- Resumen --")
+    print(f"Imágenes procesadas:    {resultado.total}")
+    print(f"Con rostro detectado:   {resultado.detectadas}")
+    print(f"Sin rostro detectado:   {resultado.sin_deteccion}")
+    print(f"Tiempo total:           {pyfeat.formato_tiempo(resultado.segundos)} ({vel:.1f} img/s)")
+    print(f"\nCSV de features -> {resultado.csv}")
+    print(f"Reporte         -> {reporte}")
+
+
+def ejecutar_pyfeat_test(n: int) -> None:
+    """Modo test (-pt N): calibra Py-Feat sobre N imágenes y escribe el config.
+
+    Detecta el dispositivo (GPU/CPU), mide el costo real (VRAM o RAM y tiempo),
+    recomienda batch_size/workers dejando margen para no saturar la máquina, y
+    guarda pyfeat_config.json para que -p lo use.
+    """
+    device = pyfeat.resolver_dispositivo()
+    print(f"== TEST/calibración Py-Feat ({n} imágenes) ==")
+    print(f"Dispositivo detectado: {'GPU (CUDA)' if device == 'cuda' else 'CPU'}")
+    print(f"Origen: {config.DATASET_V4_ROOT}")
+
+    imagenes = list(dataset.descubrir_imagenes(config.DATASET_V4_ROOT))[:n]
+    if not imagenes:
+        print("No hay imágenes reescaladas. Corre primero la tarea 5 (python main.py -e).")
+        return
+    todas = dataset.contar_imagenes(config.DATASET_V4_ROOT)
+
+    print(f"Midiendo {len(imagenes)} imágenes (carga de modelos + inferencia)...\n")
+    m = pyfeat.test_rendimiento(imagenes, device=device)
+
+    print("-- Métricas --")
+    print(f"Imágenes medidas:        {m.n}")
+    print(f"Con rostro detectado:    {m.detectadas}/{m.n}")
+    print(f"Carga de modelos:        {pyfeat.formato_tiempo(m.t_carga)} (una sola vez)")
+    print(f"Inferencia total:        {pyfeat.formato_tiempo(m.t_total_infer)} "
+          f"(batch del test: {m.batch_test})")
+    print(f"Tiempo PROMEDIO/imagen:  {m.t_promedio:.3f} s/img  ({1/m.t_promedio:.2f} img/s)"
+          if m.t_promedio else "Tiempo PROMEDIO/imagen:  n/a")
+
+    if m.device == "cuda":
+        print(f"VRAM tarjeta:            {m.vram_total_mb / 1024:.1f} GB")
+        print(f"VRAM modelos (base):     {m.vram_base_mb / 1024:.2f} GB")
+        print(f"VRAM pico (inferencia):  {m.vram_pico_mb / 1024:.2f} GB")
+        per_img = (m.vram_pico_mb - m.vram_base_mb) / m.batch_test if m.batch_test else 0.0
+        print(f"VRAM por imagen (aprox): {per_img:.1f} MB")
+    else:
+        ram_total, ram_disp = pyfeat.memoria_sistema_gb()
+        print(f"RAM PICO (1 detector):   {m.ram_pico_mb:.0f} MB ({m.ram_pico_mb / 1024:.2f} GB)")
+        if ram_total:
+            print(f"RAM sistema:             {ram_total:.1f} GB total, "
+                  f"{ram_disp:.1f} GB disponible")
+
+    # Recomendación + escritura del config.
+    rec = pyfeat.recomendar(m)
+    cfg_path = pyfeat.guardar_config(rec, m)
+
+    print("\n-- Estimación para el dataset completo --")
+    print(f"Imágenes totales:        {todas}")
+    est_1 = m.t_promedio * todas
+    print(f"A este ritmo (1 hilo):   ~{pyfeat.formato_tiempo(est_1)}")
+
+    print("\n-- Recomendación (escrita en el config) --")
+    if rec["device"] == "cuda":
+        print(f"Dispositivo:             GPU (CUDA)")
+        print(f"batch_size:              {rec['batch_size']}")
+        print("Procesos:                1 (en GPU no se reparte en procesos)")
+    else:
+        print(f"Dispositivo:             CPU")
+        print(f"Procesos (--workers):    {rec['workers']} "
+              f"(deja {config.PYFEAT_CPU_RESERVA} núcleos libres)")
+        est_par = est_1 / rec["workers"] if rec["workers"] else est_1
+        print(f"Tiempo estimado:         ~{pyfeat.formato_tiempo(est_par)}")
+    print(f"\nConfig guardado en -> {cfg_path}")
+    print("Ahora puedes correr la tarea 6 con esos parámetros: python main.py -p")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construye el parser de opciones. Cada etapa de QC es una opción aparte."""
     parser = argparse.ArgumentParser(
@@ -206,6 +356,28 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Tarea 5: reescalar las sobrevivientes a 128x128 en un dataset nuevo (paralelo).",
     )
+    parser.add_argument(
+        "-p",
+        "--pyfeat",
+        action="store_true",
+        help="Tarea 6: correr Py-Feat sobre el dataset 128x128 y guardar el CSV de features.",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        metavar="N",
+        help=f"Con -p: nº de procesos en paralelo (por defecto {config.PYFEAT_WORKERS}).",
+    )
+    parser.add_argument(
+        "-t",
+        "--test",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Con -p: modo test de rendimiento sobre N imágenes (mide tiempo y RAM). "
+             "Usar como: python main.py -pt N  (o -p -t N).",
+    )
     return parser
 
 
@@ -214,7 +386,8 @@ def main() -> None:
     args = parser.parse_args()
 
     # Sin ninguna etapa seleccionada no hay nada que ejecutar: mostramos la ayuda.
-    if not (args.integridad or args.duplicados or args.luminancia or args.reescalar):
+    if not (args.integridad or args.duplicados or args.luminancia
+            or args.reescalar or args.pyfeat):
         # -r por sí solo no hace nada: hay que indicar qué etapa correr.
         parser.print_help()
         return
@@ -230,6 +403,12 @@ def main() -> None:
 
     if args.reescalar:
         ejecutar_reescalado()
+
+    if args.pyfeat:
+        if args.test is not None:
+            ejecutar_pyfeat_test(args.test)
+        else:
+            ejecutar_pyfeat(workers=args.workers)
 
 
 if __name__ == "__main__":
