@@ -57,6 +57,43 @@ python main.py [opciones]      # ver tabla de opciones abajo
 
 ---
 
+## Probar el modelo ya entrenado (sin reentrenar ni extraer landmarks)
+
+El repo **ya incluye el modelo entrenado** (`models/random_forest.joblib`) y los
+datos necesarios (`features/pyfeat_v6.csv` + el split). Para correrlo y ver los
+resultados **no hace falta GPU, ni Py-Feat, ni volver a extraer landmarks**:
+
+```bash
+git clone <repo> && cd modulo_rostro
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt      # NO instala py-feat (no se necesita)
+
+python main.py --test-final          # evalúa el modelo sobre el test reservado
+```
+
+Esto imprime accuracy, F1 y el reporte por clase, y genera las imágenes (matriz de
+confusión, métricas por clase, importancia de features) en
+`reportes/modelo/<fecha_hora>/`.
+
+### Revisar / mejorar el entrenamiento
+
+El código del entrenamiento está en [`src/modelo/`](src/modelo/):
+
+- `random_forest.py` — entrenamiento, evaluación, guardado del modelo.
+- `datos.py` — carga del dataset y split 70/15/15.
+- `graficos.py` — matriz de confusión y gráficos.
+- `config_entrenamiento.txt` (raíz) — hiperparámetros editables.
+
+Para experimentar con otra configuración (sigue **sin** necesitar landmarks ni GPU):
+
+```bash
+# editar config_entrenamiento.txt (o pasar flags) y reentrenar:
+python main.py -rf --n-estimators 500 --max-depth 25
+python main.py --test-final
+```
+
+---
+
 ## Opciones disponibles
 
 Cada etapa por defecto **solo escanea y reporta**. Para que además elimine del
@@ -200,8 +237,9 @@ columnas `x_*` / `y_*`.
   vuelve a correr `python main.py -rf`. Los flags de CLI (`--n-estimators`, etc.)
   **sobreescriben** lo del archivo para una corrida puntual (útil en el loop).
   Para volver al punto de partida: `python main.py --reset-config` (restaura los
-  valores de referencia, definidos en `src/config.py`). El archivo está en
-  `.gitignore` porque es de trabajo; la referencia versionada vive en `config.py`.
+  valores de referencia, definidos en `src/config.py`). El archivo **se versiona**
+  (se sube a GitHub) porque es parte de la configuración del entrenamiento; la
+  referencia para `--reset-config` vive en `config.py`.
 - **Features:** los 20 AUs + `FaceScore` (CLAUDE.md §5.1).
 - **Split 70/15/15** estratificado por clase y **determinista** (semilla fija): se
   guarda en `features/split_train_val_test.csv` y se **reutiliza** en cada corrida,

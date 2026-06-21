@@ -156,15 +156,16 @@ def entrenar(hp: Hiperparametros, callback=None):
         acc_val = rf.score(X_val, y_val)
         historia.append((n, float(acc_val)))
         ckpt = config.MODELO_CHECKPOINTS_DIR / f"rf_{n:04d}_arboles.joblib"
-        joblib.dump(rf, ckpt)
+        joblib.dump(rf, ckpt, compress=3)
         if callback is not None:
             callback(n, hp.n_estimators, acc_val, time.time() - t0)
 
     metricas_val = evaluar(rf, X_val, y_val)
 
-    # Modelo final + metadatos para inferencia.
+    # Modelo final + metadatos para inferencia. compress=3 lo deja liviano (~MB)
+    # para poder versionarlo en GitHub.
     config.MODELO_DIR.mkdir(parents=True, exist_ok=True)
-    joblib.dump(rf, config.MODELO_RF)
+    joblib.dump(rf, config.MODELO_RF, compress=3)
     _guardar_meta(rf, hp, metricas_val, len(X_tr))
     _guardar_reporte(hp, metricas_val, len(X_tr), len(X_val), time.time() - t0)
 

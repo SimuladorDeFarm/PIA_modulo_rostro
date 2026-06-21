@@ -1,0 +1,57 @@
+{
+  "generado": "2026-06-21 19:00:13",
+  "features": [
+    "AU01",
+    "AU02",
+    "AU04",
+    "AU05",
+    "AU06",
+    "AU07",
+    "AU09",
+    "AU10",
+    "AU11",
+    "AU12",
+    "AU14",
+    "AU15",
+    "AU17",
+    "AU20",
+    "AU23",
+    "AU24",
+    "AU25",
+    "AU26",
+    "AU28",
+    "AU43",
+    "FaceScore"
+  ],
+  "clases": [
+    "anger",
+    "disgust",
+    "fear",
+    "happy",
+    "neutral",
+    "sad",
+    "surprise"
+  ],
+  "hiperparametros": {
+    "n_estimators": 300,
+    "max_depth": null,
+    "min_samples_leaf": 1,
+    "min_samples_split": 2,
+    "max_features": "sqrt",
+    "criterion": "gini",
+    "bootstrap": true,
+    "class_weight": "balanced",
+    "seed": 42
+  },
+  "split": {
+    "ratios": [
+      0.7,
+      0.15,
+      0.15
+    ],
+    "seed": 42
+  },
+  "n_train": 18639,
+  "val_accuracy": 0.509386733416771,
+  "val_f1_macro": 0.4740062625594398
+}
