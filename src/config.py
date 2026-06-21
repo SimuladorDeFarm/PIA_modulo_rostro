@@ -88,3 +88,63 @@ PYFEAT_CONFIG_JSON = PROJECT_ROOT / "pyfeat_config.json"
 PYFEAT_VRAM_MARGEN = 0.85
 # Núcleos de CPU a dejar libres para que el sistema siga usable mientras corre.
 PYFEAT_CPU_RESERVA = 2
+
+# Filtrado del CSV (tareas 7, 8, 9): v5 -> v6. v5 es la salida cruda de Py-Feat
+# (local o Colab). El archivo que tenemos vino de Colab y está en la raíz del
+# proyecto. v6 es el CSV final que usa el Random Forest.
+PYFEAT_CSV_V5 = PROJECT_ROOT / "pyfeat_features_v5.csv"
+PYFEAT_CSV_V6 = FEATURES_DIR / "pyfeat_v6.csv"
+FILTRADO_DIR = REPORTES_DIR / "filtrado"
+REPORTE_FILTRADO_TXT = FILTRADO_DIR / "log_qc_consolidado.txt"
+
+# Taxonomía unificada (7 emociones, CLAUDE.md §7). AffectNet trae además
+# 'contempt' (desprecio), que NO está en la taxonomía del proyecto y se descarta.
+TAXONOMIA_7 = ["neutral", "happy", "sad", "anger", "fear", "disgust", "surprise"]
+CLASE_EXCLUIDA = "contempt"
+
+# Umbrales de filtrado del CSV (tareas 7-8), confirmados con el Líder Desarrollo.
+FACESCORE_MIN = 0.90      # tarea 7: confianza mínima de detección de rostro
+POSE_MAX_GRADOS = 45.0    # tarea 7: |yaw|,|pitch|,|roll| máximo (rostro no girado)
+
+# ----------------------------------------------------------------------------- #
+# Random Forest (entrenamiento del clasificador de emociones)
+# ----------------------------------------------------------------------------- #
+# Lee el v6 (features/pyfeat_v6.csv). La etiqueta es la columna 'clase' (derivada
+# de la carpeta de AffectNet). Decisión del Líder Desarrollo: NO se usa
+# labels_split.csv; el split se hace aquí, 70/15/15 estratificado.
+LABEL_COL = "clase"
+# Features de entrada: los 20 AUs (se importan de src.qc.pyfeat) + FaceScore.
+RF_FEATURE_EXTRA = ["FaceScore"]
+
+# Split 70/15/15 (train/val/test), estratificado por clase y DETERMINISTA (semilla
+# fija). Se guarda en disco y se reutiliza: así el test queda reservado y NUNCA se
+# toca hasta la evaluación final. Para rehacerlo hay que pedirlo explícitamente.
+SPLIT_RATIOS = (0.70, 0.15, 0.15)   # train, val, test
+SPLIT_SEED = 42
+SPLIT_CSV = FEATURES_DIR / "split_train_val_test.csv"
+
+# Artefactos del modelo (pesados / derivados -> van al .gitignore).
+MODELO_DIR = PROJECT_ROOT / "models"
+MODELO_RF = MODELO_DIR / "random_forest.joblib"          # modelo final (inferencia)
+MODELO_META = MODELO_DIR / "random_forest_meta.json"     # features, clases, métricas
+MODELO_CHECKPOINTS_DIR = MODELO_DIR / "checkpoints"      # checkpoints durante el fit
+REPORTE_MODELO_DIR = REPORTES_DIR / "modelo"
+REPORTE_ENTRENAMIENTO_TXT = REPORTE_MODELO_DIR / "reporte_entrenamiento.txt"
+REPORTE_TEST_TXT = REPORTE_MODELO_DIR / "reporte_test_final.txt"
+
+# Hiperparámetros de REFERENCIA del Random Forest. Son los valores a los que
+# `--reset-config` restaura el archivo editable de entrenamiento.
+RF_N_ESTIMATORS = 300
+RF_MAX_DEPTH = None            # None = sin límite
+RF_MIN_SAMPLES_LEAF = 1
+RF_MIN_SAMPLES_SPLIT = 2
+RF_MAX_FEATURES = "sqrt"
+RF_CRITERION = "gini"          # gini | entropy | log_loss
+RF_BOOTSTRAP = True
+RF_CLASS_WEIGHT = "balanced"   # compensa el desbalance de clases
+RF_CHECKPOINT_CADA = 50        # guardar un checkpoint cada N árboles
+
+# Archivo de texto editable para tunear el entrenamiento sin tocar código. Lo lee
+# `-rf`; `--reset-config` lo restaura a los valores de referencia de arriba. Es
+# de trabajo (cada experimento), por eso va al .gitignore.
+ENTRENAMIENTO_CONFIG_TXT = PROJECT_ROOT / "config_entrenamiento.txt"

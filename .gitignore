@@ -6,8 +6,15 @@ CLAUDE.md
 AffNet_128/
 reportes/
 
+# Modelos entrenados y checkpoints (pesados, derivados)
+models/
+modelo/
+
 # Calibración de Py-Feat: específica de cada máquina (GPU/CPU/RAM), no se versiona
 pyfeat_config.json
+
+# Config editable de entrenamiento (de trabajo; la referencia vive en src/config.py)
+config_entrenamiento.txt
 
 # Entornos virtuales
 .venv/

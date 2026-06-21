@@ -27,7 +27,10 @@ import sys
 import time
 
 from src import config, dataset
-from src.qc import duplicados, integridad, luminancia, pyfeat, reescalado
+from src.modelo import config_entrenamiento
+from src.modelo import datos as modelo_datos
+from src.modelo import random_forest
+from src.qc import duplicados, filtrado, integridad, luminancia, pyfeat, reescalado
 
 
 def ejecutar_integridad(remove: bool = False) -> None:
@@ -319,6 +322,153 @@ def ejecutar_pyfeat_test(n: int) -> None:
     print("Ahora puedes correr la tarea 6 con esos parámetros: python main.py -p")
 
 
+def ejecutar_filtrado() -> None:
+    """Tareas 7-9: filtra el CSV de Py-Feat (v5 -> v6) y escribe el log consolidado."""
+    print("== QC tareas 7-9: filtrado del CSV (v5 -> v6) ==")
+    if not config.PYFEAT_CSV_V5.exists():
+        print(f"No existe el CSV de Py-Feat (v5): {config.PYFEAT_CSV_V5}")
+        print("Genera primero v5 (tarea 6, Py-Feat) o ajusta PYFEAT_CSV_V5 en src/config.py.")
+        return
+
+    print(f"Entrada (v5): {config.PYFEAT_CSV_V5}")
+    print(f"Salida (v6):  {config.PYFEAT_CSV_V6}")
+    print(f"Umbrales: FaceScore >= {config.FACESCORE_MIN}, "
+          f"pose <= {config.POSE_MAX_GRADOS}°, excluye '{config.CLASE_EXCLUIDA}'")
+
+    res = filtrado.filtrar()
+    log = filtrado.guardar_log(res)
+
+    print("\n-- Descartes por filtro --")
+    print(f"Total inicial (v5):       {res.total_inicial}")
+    print(f"  contempt:               {res.desc_contempt}")
+    print(f"  multi-rostro:           {res.desc_multirostro}")
+    print(f"  T7 FaceScore:           {res.desc_facescore}")
+    print(f"  T7 pose:                {res.desc_pose}")
+    print(f"  T8 landmarks NaN:       {res.desc_landmark_nan}")
+    print(f"  T8 AUs degenerados:     {res.desc_au_degenerado}")
+    print(f"Total final (v6):         {res.total_final}")
+
+    print("\n-- Distribución de clases (v6) --")
+    for clase in config.TAXONOMIA_7:
+        n = res.distribucion.get(clase, 0)
+        pct = 100 * n / res.total_final if res.total_final else 0.0
+        print(f"  {clase:10s} {n:6d}  ({pct:4.1f}%)")
+
+    print(f"\nCSV v6 -> {res.csv_v6}")
+    print(f"Log     -> {log}")
+
+
+def ejecutar_random_forest(args) -> None:
+    """Entrena el Random Forest sobre train, evalúa en val y guarda el modelo.
+
+    El test queda reservado: NO se evalúa aquí (usar --test-final cuando el modelo
+    esté elegido).
+    """
+    print("== Random Forest: entrenamiento (train + val) ==")
+    if not config.PYFEAT_CSV_V6.exists():
+        print(f"No existe el dataset v6: {config.PYFEAT_CSV_V6}")
+        print("Genera primero el v6 (tareas 7-9): python main.py -f")
+        return
+
+    # Split 70/15/15: se crea una vez y se reutiliza (test estable). --rehacer-split
+    # lo regenera (mueve el test, usar con cuidado).
+    rehacer = args.rehacer_split
+    if rehacer and config.SPLIT_CSV.exists():
+        print("--rehacer-split: se REGENERA el split (cambia el conjunto de test).")
+    sp = modelo_datos.crear_split(rehacer=rehacer)
+    estado = "regenerado" if rehacer or not config.SPLIT_CSV.exists() else "reutilizado"
+    conteo = sp["split"].value_counts()
+    print(f"Split 70/15/15 ({estado}): "
+          f"train {conteo.get('train', 0)} | val {conteo.get('val', 0)} | "
+          f"test {conteo.get('test', 0)} (reservado)")
+
+    # Base: el archivo editable config_entrenamiento.txt (se crea si no existe).
+    if not config_entrenamiento.existe():
+        config_entrenamiento.escribir_referencia()
+        print(f"Creado {config.ENTRENAMIENTO_CONFIG_TXT.name} con los valores de referencia "
+              "(edítalo para tunear).")
+    hp = random_forest.hiperparametros_desde_config()
+
+    # Los flags de CLI sobreescriben el archivo (para pruebas puntuales / loop).
+    if args.n_estimators is not None:
+        hp.n_estimators = args.n_estimators
+    if args.max_depth is not None:
+        hp.max_depth = args.max_depth
+    if args.min_samples_leaf is not None:
+        hp.min_samples_leaf = args.min_samples_leaf
+    if args.seed is not None:
+        hp.seed = args.seed
+    if args.max_features is not None:
+        mf = args.max_features
+        if mf not in ("sqrt", "log2"):
+            try:
+                mf = int(mf) if mf.isdigit() else float(mf)
+            except ValueError:
+                pass
+        hp.max_features = mf
+
+    print(f"Parámetros (de {config.ENTRENAMIENTO_CONFIG_TXT.name} + CLI):")
+    print(f"  n_estimators={hp.n_estimators}, max_depth={hp.max_depth}, "
+          f"min_samples_leaf={hp.min_samples_leaf}, min_samples_split={hp.min_samples_split},")
+    print(f"  max_features={hp.max_features}, criterion={hp.criterion}, "
+          f"bootstrap={hp.bootstrap}, class_weight={hp.class_weight}, seed={hp.seed}")
+    print(f"Features: {len(modelo_datos.columnas_features())} (20 AUs + FaceScore)")
+    print("Entrenando (checkpoints cada "
+          f"{hp.checkpoint_cada} árboles)...")
+
+    ultimo = [0.0]
+
+    def progreso(n, objetivo, acc_val, seg):
+        ahora = time.time()
+        if n < objetivo and ahora - ultimo[0] < 0.2:
+            return
+        ultimo[0] = ahora
+        sys.stdout.write(
+            f"\r[RF] {n}/{objetivo} árboles | val acc {acc_val:.4f} | {seg:5.1f}s   "
+        )
+        sys.stdout.flush()
+
+    _, metricas, carpeta_graficos = random_forest.entrenar(hp, callback=progreso)
+    print()
+
+    print("\n-- Métricas en VALIDACIÓN --")
+    print(f"Accuracy: {metricas['accuracy']:.4f}")
+    print(f"F1 macro: {metricas['f1_macro']:.4f}")
+    print("\n" + metricas["reporte"])
+    print(f"Modelo   -> {config.MODELO_RF}")
+    print(f"Meta     -> {config.MODELO_META}")
+    print(f"Reporte  -> {config.REPORTE_ENTRENAMIENTO_TXT}")
+    print(f"Gráficos -> {carpeta_graficos}/  (matriz de confusión, métricas por clase, "
+          "importancia de features, curva de entrenamiento)")
+    print(f"Checkpoints -> {config.MODELO_CHECKPOINTS_DIR}/")
+    print("\nEl test sigue reservado. Para la evaluación final: python main.py --test-final")
+
+
+def ejecutar_reset_config() -> None:
+    """Restaura config_entrenamiento.txt a los valores de referencia (config.py)."""
+    path = config_entrenamiento.escribir_referencia()
+    print(f"Config de entrenamiento restaurado a los valores de referencia -> {path}")
+    valores = config_entrenamiento.cargar(path)
+    for nombre in config_entrenamiento.NOMBRES:
+        print(f"  {nombre} = {valores[nombre]}")
+
+
+def ejecutar_test_final() -> None:
+    """Evalúa el modelo final guardado sobre el TEST reservado (una sola vez)."""
+    print("== Random Forest: EVALUACIÓN FINAL sobre el test reservado ==")
+    try:
+        metricas = random_forest.evaluar_test()
+    except FileNotFoundError as e:
+        print(str(e))
+        return
+    print("\n-- Métricas en TEST --")
+    print(f"Accuracy: {metricas['accuracy']:.4f}")
+    print(f"F1 macro: {metricas['f1_macro']:.4f}")
+    print("\n" + metricas["reporte"])
+    print(f"Reporte  -> {config.REPORTE_TEST_TXT}")
+    print(f"Gráficos -> {metricas.get('carpeta_graficos')}/")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construye el parser de opciones. Cada etapa de QC es una opción aparte."""
     parser = argparse.ArgumentParser(
@@ -363,6 +513,44 @@ def build_parser() -> argparse.ArgumentParser:
         help="Tarea 6: correr Py-Feat sobre el dataset 128x128 y guardar el CSV de features.",
     )
     parser.add_argument(
+        "-f",
+        "--filtrar",
+        action="store_true",
+        help="Tareas 7-9: filtrar el CSV de Py-Feat (v5 -> v6) y escribir el log consolidado.",
+    )
+    parser.add_argument(
+        "-rf",
+        "--random-forest",
+        action="store_true",
+        help="Entrenar el Random Forest (train+val) y guardar el modelo. El test queda reservado.",
+    )
+    parser.add_argument(
+        "--test-final",
+        action="store_true",
+        help="Evaluar el modelo final guardado sobre el TEST reservado (una sola vez).",
+    )
+    parser.add_argument(
+        "--rehacer-split",
+        action="store_true",
+        help="Con -rf: regenerar el split 70/15/15 (cambia el conjunto de test).",
+    )
+    parser.add_argument(
+        "--reset-config",
+        action="store_true",
+        help="Restaurar config_entrenamiento.txt a los valores de referencia.",
+    )
+    # Hiperparámetros del Random Forest (para -rf y el loop de entrenamiento).
+    parser.add_argument("--n-estimators", type=int, default=None, metavar="N",
+                        help=f"RF: nº de árboles (def. {config.RF_N_ESTIMATORS}).")
+    parser.add_argument("--max-depth", type=int, default=None, metavar="N",
+                        help="RF: profundidad máxima (def. sin límite).")
+    parser.add_argument("--min-samples-leaf", type=int, default=None, metavar="N",
+                        help=f"RF: mínimo de muestras por hoja (def. {config.RF_MIN_SAMPLES_LEAF}).")
+    parser.add_argument("--max-features", default=None, metavar="V",
+                        help=f"RF: features por split (def. {config.RF_MAX_FEATURES}).")
+    parser.add_argument("--seed", type=int, default=None, metavar="N",
+                        help=f"Semilla del RF y del split (def. {config.SPLIT_SEED}).")
+    parser.add_argument(
         "--workers",
         type=int,
         default=None,
@@ -387,10 +575,14 @@ def main() -> None:
 
     # Sin ninguna etapa seleccionada no hay nada que ejecutar: mostramos la ayuda.
     if not (args.integridad or args.duplicados or args.luminancia
-            or args.reescalar or args.pyfeat):
+            or args.reescalar or args.pyfeat or args.filtrar
+            or args.random_forest or args.test_final or args.reset_config):
         # -r por sí solo no hace nada: hay que indicar qué etapa correr.
         parser.print_help()
         return
+
+    if args.reset_config:
+        ejecutar_reset_config()
 
     if args.integridad:
         ejecutar_integridad(remove=args.remove)
@@ -409,6 +601,15 @@ def main() -> None:
             ejecutar_pyfeat_test(args.test)
         else:
             ejecutar_pyfeat(workers=args.workers)
+
+    if args.filtrar:
+        ejecutar_filtrado()
+
+    if args.random_forest:
+        ejecutar_random_forest(args)
+
+    if args.test_final:
+        ejecutar_test_final()
 
 
 if __name__ == "__main__":
